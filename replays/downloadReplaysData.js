@@ -1,22 +1,60 @@
-const https = require('http');
+const https = require('https');
 const fs = require('fs');
 
-http://replay113.valve.net/570/4080666526_1704213027.dem.bz2
+let matchesData = fs.readFileSync('./matches_data.json', {
+	encoding: 'utf-8'
+});
 
+let matches = JSON.parse(matchesData);
+let replaysData = {};
 
-{
-	"match_id":4174654504,
-	"duration":2720,
-	"start_time":1539871320,
-	"radiant_team_id":3265632,
-	"radiant_name":"PG.Barracx",
-	"dire_team_id":3785359,
-	"dire_name":"BOOM ID",
-	"leagueid":10159,
-	"league_name":"World Electronic Sport Games Southeast Asia",
-	"series_id":256525,
-	"series_type":1,
-	"radiant_score":37,
-	"dire_score":32,
-	"radiant_win":false
+function downloadReplaysData() {
+	let i = 0;
+	let interval = setInterval(() => {
+		if (i >= matches.length) {
+			clearInterval(interval);
+			fs.writeFileSync(`.data/replays_data/replays_data${new Date().getTime()}.json`, JSON.stringify(replaysData), 'utf-8');
+		} else {
+			downloadReplayData(matches[i].match_id);
+			i++;
+		}
+	}, 1000);
 }
+
+
+function downloadReplayData(matchId) {
+	const options = {
+		hostname: 'api.opendota.com',
+		path: '/api/matches/' + matchId,
+	};
+
+	https.get(options, (resp) => {
+		let data = '';
+
+		resp.on('data', (chunk) => {
+			data += chunk;
+		});
+
+		resp.on('end', () => {
+			let parsedData = JSON.parse(data);
+
+			let replayData = {
+				id: matchId,
+				radiantWins: parsedData.radiant_win,
+				duration: parsedData.duration,
+				url: parsedData.replay_url
+			};
+			if (!parsedData.match_id) {
+				console.log(matchId);
+			}
+
+			replaysData[matchId] = replayData;
+			fs.writeFileSync(`./data/replays_data/replays_data${new Date().getTime()}.json`, JSON.stringify(replaysData), 'utf-8');
+		});
+	}).on("error", (err) => {
+		console.log("Error: " + err.message);
+	});
+}
+
+// downloadReplaysData();
+downloadReplayData('4174654504');

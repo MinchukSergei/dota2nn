@@ -7,6 +7,7 @@ let matchesData = fs.readFileSync('./matches_data.json', {
 
 let matches = JSON.parse(matchesData);
 let replaysData = {};
+let missed = [];
 
 function downloadReplaysData() {
 	let i = 0;
@@ -14,6 +15,7 @@ function downloadReplaysData() {
 		if (i >= matches.length) {
 			clearInterval(interval);
 			fs.writeFileSync(`.data/replays_data/replays_data${new Date().getTime()}.json`, JSON.stringify(replaysData), 'utf-8');
+			fs.writeFileSync(`.data/replays_data/missed${new Date().getTime()}.json`, JSON.stringify(missed), 'utf-8');
 		} else {
 			downloadReplayData(matches[i].match_id);
 			i++;
@@ -46,15 +48,14 @@ function downloadReplayData(matchId) {
 			};
 			if (!parsedData.match_id) {
 				console.log(matchId);
+				missed.push(matchId);
+			} else {
+				replaysData[matchId] = replayData;
 			}
-
-			replaysData[matchId] = replayData;
-			fs.writeFileSync(`./data/replays_data/replays_data${new Date().getTime()}.json`, JSON.stringify(replaysData), 'utf-8');
 		});
 	}).on("error", (err) => {
 		console.log("Error: " + err.message);
 	});
 }
 
-// downloadReplaysData();
-downloadReplayData('4174654504');
+downloadReplaysData();

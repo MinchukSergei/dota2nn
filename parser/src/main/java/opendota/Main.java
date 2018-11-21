@@ -1,9 +1,6 @@
 package opendota;
 
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.net.InetSocketAddress;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -24,8 +21,9 @@ public class Main {
             t.sendResponseHeaders(200, 0);
             InputStream is = t.getRequestBody();
             OutputStream os = new FileOutputStream("./output.txt");
+            PrintWriter pr = new PrintWriter(new BufferedWriter(new FileWriter("./log.txt", true)));
             try {
-            	new Parse(is, os);
+            	new Parse(is, os, pr);
             }
             catch (Exception e)
             {
@@ -34,6 +32,7 @@ public class Main {
             os.close();
             OutputStream os2 = t.getResponseBody();
             os2.close();
+            pr.close();
         }
     }
 }

@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import opendota.entity.DeathInfo;
 import opendota.entity.Entry;
 import opendota.entity.Item;
+import opendota.entity.TeamWorthInfo;
 import opendota.exception.UnknownItemFoundException;
 import skadistats.clarity.decoder.Util;
 import skadistats.clarity.model.CombatLogEntry;
@@ -21,9 +22,7 @@ import skadistats.clarity.processor.stringtables.UsesStringTable;
 import skadistats.clarity.source.InputStreamSource;
 import skadistats.clarity.wire.common.proto.DotaUserMessages;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -42,11 +41,13 @@ public class Parse {
     private Gson g = new Gson();
     private DeathInfo deathInfo;
     private HashMap<String, Integer> slotByName;
+    private PrintWriter pr;
 
     private ArrayList<Entry> logBuffer = new ArrayList<>();
 
-    public Parse(InputStream is, OutputStream os) throws IOException {
+    public Parse(InputStream is, OutputStream os, PrintWriter pr) throws IOException {
         this.os = os;
+        this.pr = pr;
         this.deathInfo = new DeathInfo();
         this.slotByName = new HashMap<>();
 
@@ -66,11 +67,12 @@ public class Parse {
             if (gameStartTime == 0) {
                 logBuffer.add(e);
             } else {
-                e.time -= gameStartTime;
+//                e.time -= gameStartTime;
                 this.os.write((g.toJson(e) + "\n").getBytes());
             }
         } catch (IOException ex) {
             ex.printStackTrace();
+            pr.print(ex.getMessage() + ": output");
         }
     }
 
@@ -115,12 +117,12 @@ public class Parse {
             if (cle.getType().equals(DotaUserMessages.DOTA_COMBATLOG_TYPES.DOTA_COMBATLOG_DEATH) && cle.getType().ordinal() <= 19) {
                 if (cle.getTargetName().contains("tower")) {
                     this.updateTowerDeathInfo(combatLogEntry);
-                    output(combatLogEntry);
+//                    output(combatLogEntry);
                 }
 
                 if (cle.getTargetName().contains("roshan")) {
                     this.updateRoshanDeathInfo(combatLogEntry);
-                    output(combatLogEntry);
+//                    output(combatLogEntry);
                 }
             }
         } catch (Exception e) {
@@ -135,21 +137,21 @@ public class Parse {
 
         if (targetName.contains("top")) {
             if (targetName.contains("tower1")) {
-                if (isRadiant) {
+                if (!isRadiant) {
                     this.deathInfo.radiantTower1Top = 1;
                 } else {
                     this.deathInfo.direTower1Top = 1;
                 }
             }
             if (targetName.contains("tower2")) {
-                if (isRadiant) {
+                if (!isRadiant) {
                     this.deathInfo.radiantTower2Top = 1;
                 } else {
                     this.deathInfo.direTower2Top = 1;
                 }
             }
             if (targetName.contains("tower3")) {
-                if (isRadiant) {
+                if (!isRadiant) {
                     this.deathInfo.radiantTower3Top = 1;
                 } else {
                     this.deathInfo.direTower3Top = 1;
@@ -159,21 +161,21 @@ public class Parse {
 
         if (targetName.contains("mid")) {
             if (targetName.contains("tower1")) {
-                if (isRadiant) {
+                if (!isRadiant) {
                     this.deathInfo.radiantTower1Mid = 1;
                 } else {
                     this.deathInfo.direTower1Mid = 1;
                 }
             }
             if (targetName.contains("tower2")) {
-                if (isRadiant) {
+                if (!isRadiant) {
                     this.deathInfo.radiantTower2Mid = 1;
                 } else {
                     this.deathInfo.direTower2Mid = 1;
                 }
             }
             if (targetName.contains("tower3")) {
-                if (isRadiant) {
+                if (!isRadiant) {
                     this.deathInfo.radiantTower3Mid = 1;
                 } else {
                     this.deathInfo.direTower3Mid = 1;
@@ -183,21 +185,21 @@ public class Parse {
 
         if (targetName.contains("bot")) {
             if (targetName.contains("tower1")) {
-                if (isRadiant) {
+                if (!isRadiant) {
                     this.deathInfo.radiantTower1Bot = 1;
                 } else {
                     this.deathInfo.direTower1Bot = 1;
                 }
             }
             if (targetName.contains("tower2")) {
-                if (isRadiant) {
+                if (!isRadiant) {
                     this.deathInfo.radiantTower2Bot = 1;
                 } else {
                     this.deathInfo.direTower2Bot = 1;
                 }
             }
             if (targetName.contains("tower3")) {
-                if (isRadiant) {
+                if (!isRadiant) {
                     this.deathInfo.radiantTower3Bot = 1;
                 } else {
                     this.deathInfo.direTower3Bot = 1;
@@ -263,6 +265,9 @@ public class Parse {
             }
 
             if (!postGame && time >= nextInterval) {
+                Entry entry = new Entry();
+                TeamWorthInfo teamWorthInfo = new TeamWorthInfo();
+
                 for (int i = 0; i < numPlayers; i++) {
                     Integer hero = getEntityProperty(pr, "m_vecPlayerTeamData.%i.m_nSelectedHeroID", validIndices[i]);
                     int handle = getEntityProperty(pr, "m_vecPlayerTeamData.%i.m_hSelectedHero", validIndices[i]);
@@ -272,57 +277,46 @@ public class Parse {
                     //2 is radiant, 3 is dire, 1 is other?
                     Entity dataTeam = playerTeam == 2 ? rData : dData;
 
-                    if (playerTeam == 2 || playerTeam == 3) {
-                        Entry entry = new Entry(time);
-                        entry.type = "interval";
-                        entry.slot = i;
-                        entry.level = getEntityProperty(pr, "m_vecPlayerTeamData.%i.m_iLevel", validIndices[i]);
-                        entry.kills = getEntityProperty(pr, "m_vecPlayerTeamData.%i.m_iKills", validIndices[i]);
-                        entry.deaths = getEntityProperty(pr, "m_vecPlayerTeamData.%i.m_iDeaths", validIndices[i]);
-                        entry.assists = getEntityProperty(pr, "m_vecPlayerTeamData.%i.m_iAssists", validIndices[i]);
-                        entry.denies = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_iDenyCount", teamSlot);
-                        entry.roshans_killed = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_iRoshanKills", teamSlot);
-//
-//                    entry.towers_killed = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_iTowerKills", teamSlot);
-//                    entry.obs_placed = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_iObserverWardsPlaced", teamSlot);
-//                    entry.sen_placed = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_iSentryWardsPlaced", teamSlot);
-//                    entry.rune_pickups = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_iRunePickups", teamSlot);
-                        entry.rt1t = this.deathInfo.radiantTower1Top;
-                        entry.rt2t = this.deathInfo.radiantTower2Top;
-                        entry.rt3t = this.deathInfo.radiantTower3Top;
-                        entry.rt1m = this.deathInfo.radiantTower1Mid;
-                        entry.rt2m = this.deathInfo.radiantTower2Mid;
-                        entry.rt3m = this.deathInfo.radiantTower3Mid;
-                        entry.rt1b = this.deathInfo.radiantTower1Bot;
-                        entry.rt2b = this.deathInfo.radiantTower2Bot;
-                        entry.rt3b = this.deathInfo.radiantTower3Bot;
+                    if (playerTeam == 2 || playerTeam == 3 && teamSlot >= 0) {
 
-                        entry.rRosh = this.deathInfo.radiantRoshan;
+//                        entry.type = "interval";
+//                        entry.slot = i;
 
-                        entry.dt1t = this.deathInfo.direTower1Top;
-                        entry.dt2t = this.deathInfo.direTower2Top;
-                        entry.dt3t = this.deathInfo.direTower3Top;
-                        entry.dt1m = this.deathInfo.direTower1Mid;
-                        entry.dt2m = this.deathInfo.direTower2Mid;
-                        entry.dt3m = this.deathInfo.direTower3Mid;
-                        entry.dt1b = this.deathInfo.direTower1Bot;
-                        entry.dt2b = this.deathInfo.direTower2Bot;
-                        entry.dt3b = this.deathInfo.direTower3Bot;
+                        Integer level = getEntityProperty(pr, "m_vecPlayerTeamData.%i.m_iLevel", validIndices[i]);
+                        Integer kills = getEntityProperty(pr, "m_vecPlayerTeamData.%i.m_iKills", validIndices[i]);
+                        Integer deaths = getEntityProperty(pr, "m_vecPlayerTeamData.%i.m_iDeaths", validIndices[i]);
+                        Integer assists = getEntityProperty(pr, "m_vecPlayerTeamData.%i.m_iAssists", validIndices[i]);
+                        Integer denies = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_iDenyCount", teamSlot);
+                        Integer gold = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_iTotalEarnedGold", teamSlot);
+                        Integer lh = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_iLastHitCount", teamSlot);
+                        Integer xp = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_iTotalEarnedXP", teamSlot);
 
-                        entry.dRosh = this.deathInfo.direRoshan;
-
-                        if (teamSlot >= 0) {
-                            entry.gold = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_iTotalEarnedGold", teamSlot);
-                            entry.lh = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_iLastHitCount", teamSlot);
-                            entry.xp = getEntityProperty(dataTeam, "m_vecDataTeam.%i.m_iTotalEarnedXP", teamSlot);
+                        if (i <= 4) {
+                            teamWorthInfo.rLevel += level;
+                            teamWorthInfo.rKills += kills;
+                            teamWorthInfo.rDeaths += deaths;
+                            teamWorthInfo.rAssists += assists;
+                            teamWorthInfo.rDenies += denies;
+                            teamWorthInfo.rGold += gold;
+                            teamWorthInfo.rLh += lh;
+                            teamWorthInfo.rXp += xp;
+                        } else {
+                            teamWorthInfo.dLevel += level;
+                            teamWorthInfo.dKills += kills;
+                            teamWorthInfo.dDeaths += deaths;
+                            teamWorthInfo.dAssists += assists;
+                            teamWorthInfo.dDenies += denies;
+                            teamWorthInfo.dGold += gold;
+                            teamWorthInfo.dLh += lh;
+                            teamWorthInfo.dXp += xp;
                         }
 
                         //get the player's hero entity
                         Entity e = ctx.getProcessor(Entities.class).getByHandle(handle);
                         if (e != null) {
                             //get the hero's entity name, ex: CDOTA_Hero_Zuus
-                            entry.unit = e.getDtClass().getDtName();
-                            entry.hero_id = hero;
+//                            entry.unit = e.getDtClass().getDtName();
+//                            entry.hero_id = hero;
 
                             String unit = e.getDtClass().getDtName();
                             String ending = unit.substring("CDOTA_Unit_Hero_".length());
@@ -355,9 +349,60 @@ public class Parse {
 //                            }
 //                        }
                         }
-                        output(entry);
+
+                    } else {
+                        this.pr.print(String.format("Incorrect player team or team slot: playerTeam = %d, teamSlot = %d", playerTeam, teamSlot));
                     }
                 }
+
+                time /= 60;
+
+                String precision = "%.7f";
+
+                entry.rLevel = String.format(precision, teamWorthInfo.rLevel / (double) time);
+                entry.rKills = String.format(precision, teamWorthInfo.rKills / (double) time);
+                entry.rDeaths = String.format(precision, teamWorthInfo.rDeaths / (double) time);
+                entry.rAssists = String.format(precision, teamWorthInfo.rAssists / (double) time);
+                entry.rDenies = String.format(precision, teamWorthInfo.rDenies / (double) time);
+                entry.rGold = String.format(precision, teamWorthInfo.rGold / (double) time);
+                entry.rLh = String.format(precision, teamWorthInfo.rLh / (double) time);
+                entry.rXp = String.format(precision, teamWorthInfo.rXp / (double) time);
+
+                entry.dLevel = String.format(precision, teamWorthInfo.dLevel / (double) time);
+                entry.dKills = String.format(precision, teamWorthInfo.dKills / (double) time);
+                entry.dDeaths = String.format(precision, teamWorthInfo.dDeaths / (double) time);
+                entry.dAssists = String.format(precision, teamWorthInfo.dAssists / (double) time);
+                entry.dDenies = String.format(precision, teamWorthInfo.dDenies / (double) time);
+                entry.dGold = String.format(precision, teamWorthInfo.dGold / (double) time);
+                entry.dLh = String.format(precision, teamWorthInfo.dLh / (double) time);
+                entry.dXp = String.format(precision, teamWorthInfo.dXp / (double) time);
+
+                entry.rt1t = String.format(precision, this.deathInfo.radiantTower1Top / (double) time);
+                entry.rt2t = String.format(precision, this.deathInfo.radiantTower2Top / (double) time);
+                entry.rt3t = String.format(precision, this.deathInfo.radiantTower3Top / (double) time);
+                entry.rt1m = String.format(precision, this.deathInfo.radiantTower1Mid / (double) time);
+                entry.rt2m = String.format(precision, this.deathInfo.radiantTower2Mid / (double) time);
+                entry.rt3m = String.format(precision, this.deathInfo.radiantTower3Mid / (double) time);
+                entry.rt1b = String.format(precision, this.deathInfo.radiantTower1Bot / (double) time);
+                entry.rt2b = String.format(precision, this.deathInfo.radiantTower2Bot / (double) time);
+                entry.rt3b = String.format(precision, this.deathInfo.radiantTower3Bot / (double) time);
+
+                entry.rRosh = String.format(precision, this.deathInfo.radiantRoshan / (double) time);
+
+                entry.dt1t = String.format(precision, this.deathInfo.direTower1Top / (double) time);
+                entry.dt2t = String.format(precision, this.deathInfo.direTower2Top / (double) time);
+                entry.dt3t = String.format(precision, this.deathInfo.direTower3Top / (double) time);
+                entry.dt1m = String.format(precision, this.deathInfo.direTower1Mid / (double) time);
+                entry.dt2m = String.format(precision, this.deathInfo.direTower2Mid / (double) time);
+                entry.dt3m = String.format(precision, this.deathInfo.direTower3Mid / (double) time);
+                entry.dt1b = String.format(precision, this.deathInfo.direTower1Bot / (double) time);
+                entry.dt2b = String.format(precision, this.deathInfo.direTower2Bot / (double) time);
+                entry.dt3b = String.format(precision, this.deathInfo.direTower3Bot / (double) time);
+
+                entry.dRosh = String.format(precision, this.deathInfo.direRoshan / (double) time);
+
+                output(entry);
+
                 nextInterval += INTERVAL;
             }
         }

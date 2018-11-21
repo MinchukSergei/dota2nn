@@ -1,11 +1,60 @@
 package opendota.entity;
 
 public class Entry {
-    public Integer time = 0;
+    //output values
+
+    //entity fields
+    public String rGold;
+    public String rLh;
+    public String rXp;
+    public String rLevel;
+    public String rKills;
+    public String rDeaths;
+    public String rAssists;
+    public String rDenies;
+
+    public String dGold;
+    public String dLh;
+    public String dXp;
+    public String dLevel;
+    public String dKills;
+    public String dDeaths;
+    public String dAssists;
+    public String dDenies;
+
+    //tower and roshan death info
+    public String rt1t;
+    public String rt2t;
+    public String rt3t;
+    public String rt1m;
+    public String rt2m;
+    public String rt3m;
+    public String rt1b;
+    public String rt2b;
+    public String rt3b;
+
+    public String rRosh;
+
+    public String dt1t;
+    public String dt2t;
+    public String dt3t;
+    public String dt1m;
+    public String dt2m;
+    public String dt3m;
+    public String dt1b;
+    public String dt2b;
+    public String dt3b;
+
+    public String dRosh;
+
+    public Integer time;
+    public Integer hero_id;
     public String type;
-    public String unit;
-    public Integer value;
     public Integer slot;
+    public String unit;
+
+    public Integer value;
+
     //combat log fields
     public String attackername;
     public String targetname;
@@ -16,50 +65,14 @@ public class Entry {
     public Boolean attackerillusion;
     public Boolean targetillusion;
     public String inflictor;
-    //entity fields
-    public Integer gold;
-    public Integer lh;
-    public Integer xp;
-    public Integer hero_id;
 
-    public Integer level;
-    public Integer kills;
-    public Integer deaths;
-    public Integer assists;
-    public Integer denies;
-    public Integer roshans_killed;
-
-    //tower and roshan death info
-    public Integer rt1t;
-    public Integer rt2t;
-    public Integer rt3t;
-    public Integer rt1m;
-    public Integer rt2m;
-    public Integer rt3m;
-    public Integer rt1b;
-    public Integer rt2b;
-    public Integer rt3b;
-
-    public Integer rRosh;
-
-    public Integer dt1t;
-    public Integer dt2t;
-    public Integer dt3t;
-    public Integer dt1m;
-    public Integer dt2m;
-    public Integer dt3m;
-    public Integer dt1b;
-    public Integer dt2b;
-    public Integer dt3b;
-
-    public Integer dRosh;
-
+//    public Integer roshans_killed;
 //    public Integer towers_killed;
 //    public Integer item_id;
 //    public transient List<Item> hero_inventory;
-//		public Integer obs_placed;
-//		public Integer sen_placed;
-//		public Integer rune_pickups;
+//	  public Integer obs_placed;
+//	  public Integer sen_placed;
+//	  public Integer rune_pickups;
 
     public Entry() {
     }

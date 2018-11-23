@@ -67,7 +67,7 @@ public class Parse {
             if (gameStartTime == 0) {
                 logBuffer.add(e);
             } else {
-//                e.time -= gameStartTime;
+                e.time -= gameStartTime;
                 this.os.write((g.toJson(e) + "\n").getBytes());
             }
         } catch (IOException ex) {
@@ -209,7 +209,9 @@ public class Parse {
     }
 
     private void updateRoshanDeathInfo(Entry combatLogEntry) {
-        Integer slot = this.slotByName.get(combatLogEntry.sourcename);
+        String heroName = combatLogEntry.sourcename.replaceAll("_", "");
+        Integer slot = this.slotByName.get(heroName);
+
         boolean isRadiant = slot >= 0 && slot <= 4;
 
         if (isRadiant) {
@@ -266,6 +268,7 @@ public class Parse {
 
             if (!postGame && time >= nextInterval) {
                 Entry entry = new Entry();
+                entry.time = time;
                 TeamWorthInfo teamWorthInfo = new TeamWorthInfo();
 
                 for (int i = 0; i < numPlayers; i++) {
@@ -313,25 +316,27 @@ public class Parse {
 
                         //get the player's hero entity
                         Entity e = ctx.getProcessor(Entities.class).getByHandle(handle);
-                        if (e != null) {
-                            //get the hero's entity name, ex: CDOTA_Hero_Zuus
+                        if (this.slotByName.size() != numPlayers) {
+                            if (e != null) {
+                                //get the hero's entity name, ex: CDOTA_Hero_Zuus
 //                            entry.unit = e.getDtClass().getDtName();
 //                            entry.hero_id = hero;
 
-                            String unit = e.getDtClass().getDtName();
-                            String ending = unit.substring("CDOTA_Unit_Hero_".length());
-                            String combatLogName = "npc_dota_hero_" + ending.toLowerCase();
-                            this.slotByName.putIfAbsent(combatLogName, i);
-                            //check if hero has been assigned to entity
+                                String unit = e.getDtClass().getDtName();
+                                String ending = unit.substring("CDOTA_Unit_Hero_".length());
+                                String combatLogName = "npc_dota_hero_" + ending.toLowerCase();
+                                combatLogName = combatLogName.replaceAll("_", "");
+                                this.slotByName.putIfAbsent(combatLogName, i);
+                                //check if hero has been assigned to entity
 //                        if (hero > 0) {
-                            //get the hero's entity name, ex: CDOTA_Hero_Zuus
+                                //get the hero's entity name, ex: CDOTA_Hero_Zuus
 //                            String unit = e.getDtClass().getDtName();
-                            //grab the end of the name, lowercase it
+                                //grab the end of the name, lowercase it
 //                            String ending = unit.substring("CDOTA_Unit_Hero_".length());
-                            //valve is bad at consistency and the combat log name could involve replacing camelCase with _ or not!
-                            //double map it so we can look up both cases
+                                //valve is bad at consistency and the combat log name could involve replacing camelCase with _ or not!
+                                //double map it so we can look up both cases
 //                            String combatLogName = "npc_dota_hero_" + ending.toLowerCase();
-                            //don't include final underscore here since the first letter is always capitalized and will be converted to underscore
+                                //don't include final underscore here since the first letter is always capitalized and will be converted to underscore
 
 //                            entry.hero_inventory = getHeroInventory(ctx, e);
 //                            if (entry.hero_inventory != null) {
@@ -348,16 +353,17 @@ public class Parse {
 //                                }
 //                            }
 //                        }
+                            }
                         }
-
                     } else {
                         this.pr.print(String.format("Incorrect player team or team slot: playerTeam = %d, teamSlot = %d", playerTeam, teamSlot));
                     }
                 }
 
-                time /= 60;
+//                time /= 60;
+                time = 1;
 
-                String precision = "%.7f";
+                String precision = "%.0f";
 
                 entry.rLevel = String.format(precision, teamWorthInfo.rLevel / (double) time);
                 entry.rKills = String.format(precision, teamWorthInfo.rKills / (double) time);

@@ -41,13 +41,11 @@ public class Parse {
     private Gson g = new Gson();
     private DeathInfo deathInfo;
     private HashMap<String, Integer> slotByName;
-    private PrintWriter pr;
 
     private ArrayList<Entry> logBuffer = new ArrayList<>();
 
-    public Parse(InputStream is, OutputStream os, PrintWriter pr) throws IOException {
+    public Parse(InputStream is, OutputStream os) throws IOException {
         this.os = os;
-        this.pr = pr;
         this.deathInfo = new DeathInfo();
         this.slotByName = new HashMap<>();
 
@@ -62,7 +60,7 @@ public class Parse {
         System.err.format("total time taken: %s\n", (tMatch) / 1000.0);
     }
 
-    private void output(Entry e) {
+    private void output(Entry e) throws Exception {
         try {
             if (gameStartTime == 0) {
                 logBuffer.add(e);
@@ -72,11 +70,11 @@ public class Parse {
             }
         } catch (IOException ex) {
             ex.printStackTrace();
-            pr.print(ex.getMessage() + ": output");
+            throw new Exception(String.format("Exception during writing to file: %s", ex.getMessage()));
         }
     }
 
-    private void flushLogBuffer() {
+    private void flushLogBuffer() throws Exception {
         for (Entry e : logBuffer) {
             output(e);
         }
@@ -224,7 +222,7 @@ public class Parse {
     @UsesStringTable("EntityNames")
     @UsesEntities
     @OnTickStart
-    public void onTickStart(Context ctx, boolean synthetic) {
+    public void onTickStart(Context ctx, boolean synthetic) throws Exception {
         //s1 DT_DOTAGameRulesProxy
         Entity grp = ctx.getProcessor(Entities.class).getByDtName("CDOTAGamerulesProxy");
         Entity pr = ctx.getProcessor(Entities.class).getByDtName("CDOTA_PlayerResource");
@@ -263,6 +261,11 @@ public class Parse {
 
                     i += 1;
                 }
+
+                if (added != numPlayers) {
+                    throw new Exception(String.format("Incorrect number of players: %d", added));
+                }
+
                 init = true;
             }
 
@@ -356,7 +359,8 @@ public class Parse {
                             }
                         }
                     } else {
-                        this.pr.print(String.format("Incorrect player team or team slot: playerTeam = %d, teamSlot = %d", playerTeam, teamSlot));
+                        String errorMessage = String.format("Incorrect player team or team slot: playerTeam = %d, teamSlot = %d", playerTeam, teamSlot);
+                        throw new Exception(errorMessage);
                     }
                 }
 

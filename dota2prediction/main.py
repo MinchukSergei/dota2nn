@@ -3,36 +3,93 @@ from keras.layers import Dense
 import json
 import numpy as np
 from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+import pandas as pd
+from pathlib import Path
+from keras import callbacks
+from keras import optimizers
+
 
 def main():
+    processed_match_data = Path('D:/Magistracy/diss/processed_match_data.npy')
+    all_match_data = []
+
+    if not processed_match_data.exists():
+        with open('D:/Magistracy/diss/replays_data.json', 'r') as f:
+            replays_data = json.load(f)
+
+        root_folder = sorted(Path('D:/Magistracy/diss/parsed_replays').glob('*.dem.txt'))
+
+        for i, f in enumerate(root_folder):
+            match_data = pd.read_json(str(f), lines=True).values
+            if len(match_data) <= 5 * 60:
+                continue
+
+            id_match = f.name[: f.name.find('_')]
+            result_radiant = replays_data[id_match]['radiantWins']
+            result_dire = not result_radiant
+            match_data = match_data[300:, :]
+            match_data_len = len(match_data)
+            match_data = match_data.astype('float32')
+
+            radiant_result_row = np.full((match_data_len, 1), result_radiant, dtype='float32')
+            dire_result_row = np.full((match_data_len, 1), result_dire, dtype='float32')
+            id_match_row = np.full((match_data_len, 1), float(id_match), dtype='float32')
+
+            match_data = np.append(match_data, radiant_result_row, axis=1)
+            match_data = np.append(match_data, dire_result_row, axis=1)
+            match_data = np.append(match_data, id_match_row, axis=1)
+            all_match_data.append(match_data)
+            print(i)
+
+        all_match_data = np.vstack(all_match_data)
+        np.save(processed_match_data, all_match_data)
+    else:
+        all_match_data = np.load(processed_match_data)
+
+    print(len(all_match_data))
+
     model = Sequential()
-    input_dim = 9  # number of data input properties
-    # xp1, xp2, net_worth1, net_worth2, kills1, death1, kills2, death2, time, winner[0-rad, 1-dire]
-    with open('./sample.json') as f:
-        train_data = np.array(json.load(f)).astype('float32')
-        train_data_x = train_data[:, :-2]
-        train_data_y = train_data[:, -2:]
-
     scaler = StandardScaler()
-    train_data_x = scaler.fit_transform(train_data_x)
 
-    model.add(Dense(units=64, activation='relu', input_dim=input_dim, kernel_regularizer='l2'))
-    model.add(Dense(units=30, activation='relu', kernel_regularizer='l2'))
+    X_train, X_test, y_train, y_test = custom_data_split(all_match_data, test_size=0.1)
+    input_dim = X_train.shape[1]
+    X_train = scaler.fit_transform(X_train)
+    X_test = scaler.transform(X_test)
+
+    model.add(Dense(units=128, activation='relu', input_dim=input_dim, kernel_regularizer='l2'))
+    model.add(Dense(units=128, activation='relu', kernel_regularizer='l2'))
+    model.add(Dense(units=128, activation='relu', kernel_regularizer='l2'))
     model.add(Dense(units=2, activation='softmax'))
 
     model.compile(loss='categorical_crossentropy',
-                  optimizer='sgd',
+                  optimizer=optimizers.Adam(lr=0.001),
                   metrics=['accuracy'])
 
-    model.fit(train_data_x, train_data_y, epochs=1000, batch_size=32)
-    loss_and_metrics = model.evaluate(train_data_x, train_data_y, batch_size=32)
+    model.fit(X_train, y_train, epochs=100, batch_size=128, callbacks=[
+        callbacks.TensorBoard(log_dir='D:/Magistracy/diss/logs/'),
+        callbacks.ModelCheckpoint(filepath='D:/Magistracy/diss/model/weights.{epoch:04d}.hdf5')
+    ])
+    loss_and_metrics = model.evaluate(X_train, y_train, batch_size=128)
     print(loss_and_metrics)
 
-    test_x = np.array([[1300, 1200, 1000, 800, 7, 5, 5, 7, 600]]).astype('float32')
-    norm_test_x = scaler.transform(test_x)
-    govno = model.evaluate(norm_test_x, np.array([[1, 0]]).astype('float32'), batch_size=32)
-    print(govno)
+    loss_and_metrics = model.evaluate(X_test, y_test, batch_size=128)
+    print(loss_and_metrics)
     pass
+
+
+def custom_data_split(all_match_data, test_size=0.3):
+    match_id_column = all_match_data[:, -1]
+    match_id_column = np.unique(match_id_column)
+
+    match_id_len = len(match_id_column)
+    pivot_match_id = int(match_id_len - match_id_len * test_size)
+    train_ids = match_id_column[:pivot_match_id]
+    test_ids = match_id_column[pivot_match_id:]
+
+    train_match_data = all_match_data[np.isin(all_match_data[:, -1], train_ids)]
+    test_match_data = all_match_data[np.isin(all_match_data[:, -1], test_ids)]
+    return train_match_data[:, :-3], test_match_data[:, :-3], train_match_data[:, -3:-1], test_match_data[:, -3:-1]
 
 
 if __name__ == '__main__':

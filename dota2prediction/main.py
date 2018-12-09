@@ -3,15 +3,20 @@ from keras.layers import Dense
 import json
 import numpy as np
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import train_test_split
 import pandas as pd
 from pathlib import Path
 from keras import callbacks
 from keras import optimizers
+from keras import regularizers
+import datetime
 
 
 def main():
+    # With time
     processed_match_data = Path('D:/Magistracy/diss/processed_match_data.npy')
+
+    # Without time
+    # processed_match_data = Path('D:/Magistracy/diss/processed_match_data_without_time.npy')
     all_match_data = []
 
     if not processed_match_data.exists():
@@ -28,7 +33,7 @@ def main():
             id_match = f.name[: f.name.find('_')]
             result_radiant = replays_data[id_match]['radiantWins']
             result_dire = not result_radiant
-            match_data = match_data[300:, :]
+            match_data = match_data[300:, :-1]
             match_data_len = len(match_data)
             match_data = match_data.astype('float32')
 
@@ -57,18 +62,26 @@ def main():
     X_train = scaler.fit_transform(X_train)
     X_test = scaler.transform(X_test)
 
-    model.add(Dense(units=128, activation='relu', input_dim=input_dim, kernel_regularizer='l2'))
-    model.add(Dense(units=128, activation='relu', kernel_regularizer='l2'))
-    model.add(Dense(units=128, activation='relu', kernel_regularizer='l2'))
+    model.add(Dense(units=64, activation='selu', kernel_initializer='lecun_normal', input_dim=input_dim,
+                    kernel_regularizer=regularizers.l1(0.001)))
+    model.add(Dense(units=64, activation='selu', kernel_initializer='lecun_normal',
+                    kernel_regularizer=regularizers.l2(0.1)))
+    model.add(Dense(units=64, activation='selu', kernel_initializer='lecun_normal',
+                    kernel_regularizer=regularizers.l2(0.1)))
     model.add(Dense(units=2, activation='softmax'))
 
     model.compile(loss='categorical_crossentropy',
-                  optimizer=optimizers.Adam(lr=0.001),
+                  optimizer=optimizers.SGD(lr=0.0001, momentum=0.9),
                   metrics=['accuracy'])
 
-    model.fit(X_train, y_train, epochs=100, batch_size=128, callbacks=[
-        callbacks.TensorBoard(log_dir='D:/Magistracy/diss/logs/'),
-        callbacks.ModelCheckpoint(filepath='D:/Magistracy/diss/model/weights.{epoch:04d}.hdf5')
+    run_number = f'{int(datetime.datetime.now().timestamp())}'
+
+    model.fit(X_train, y_train, validation_data=[X_test, y_test], epochs=50, batch_size=128, callbacks=[
+        callbacks.TensorBoard(log_dir=f'D:/Magistracy/diss/logs/run{run_number}'
+                              # write_grads=True, write_images=True,
+                              # histogram_freq=1, embeddings_data=X_train, embeddings_layer_names=['dense_3']
+                              ),
+        callbacks.ModelCheckpoint(filepath=f'D:/Magistracy/diss/logs/run{run_number}' + '/weights.{epoch:04d}.hdf5')
     ])
     loss_and_metrics = model.evaluate(X_train, y_train, batch_size=128)
     print(loss_and_metrics)
@@ -79,6 +92,7 @@ def main():
 
 
 def custom_data_split(all_match_data, test_size=0.3):
+    np.random.shuffle(all_match_data)
     match_id_column = all_match_data[:, -1]
     match_id_column = np.unique(match_id_column)
 

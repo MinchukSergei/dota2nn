@@ -15,7 +15,7 @@ def main():
     X_train = scaler.fit_transform(X_train)
     X_test = scaler.transform(X_test)
 
-    model = models.load_model('D:/Magistracy/diss/model/weights.0052.hdf5')
+    model = models.load_model('D:/Magistracy/diss/model/weights.0100.hdf5')
 
     loss_and_metrics = model.evaluate(X_train, y_train, batch_size=128)
     print(loss_and_metrics)
@@ -26,7 +26,7 @@ def main():
 
 
 def custom_data_split(all_match_data, test_size=0.3):
-    start = 6
+    start = 5
     end = 10
     match_id_column = all_match_data[:, -1]
     match_id_column = np.unique(match_id_column)
